@@ -11,7 +11,7 @@ import json
 from dotenv import load_dotenv
 
 # Incarca variabilele secrete din fisierul .env
-load_dotenv() 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -22,7 +22,6 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 PLAYLIST_CACHE = {}
-# ... restul codului ramane exact la fel ...
 DOWNLOADS_DIR = "../downloads"
 CUSTOM_PLAYLISTS_FILE = "custom_playlists.json"
 
@@ -54,6 +53,7 @@ def download_song(video_url):
     print(f"Caut si descarc: {video_url}...")
     ydl_opts = {
         'format': 'bestaudio/best',
+        'cookiefile': 'cookies.txt',
         'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -151,10 +151,11 @@ def api_search():
     query = data.get('query')
     if not query:
         return jsonify({"error": "Nu ai trimis niciun text!"}), 400
-    ydl_opts = {'extract_flat': True, 'quiet': True}
+    ydl_opts = {'extract_flat': True,
+                'quiet': True, 'cookiefile': 'cookies.txt'}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # MODIFICAT: Căutăm 10 rezultate și lăsăm algoritmul YouTube să pună cele mai vizionate piese primele
+            # Căutăm 10 rezultate
             info = ydl.extract_info(f"ytsearch10:{query}", download=False)
             results = []
             for entry in info.get('entries', []):
@@ -331,7 +332,8 @@ def api_stream():
     video_url = data.get('url')
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
-    ydl_opts = {'format': 'bestaudio/best', 'quiet': True}
+    ydl_opts = {'format': 'bestaudio/best',
+                'quiet': True, 'cookiefile': 'cookies.txt'}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
