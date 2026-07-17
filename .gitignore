@@ -1,0 +1,5 @@
+.env
+__pycache__/
+node_modules/
+downloads/
+ffmpeg-8.1.2/
