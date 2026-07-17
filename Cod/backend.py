@@ -16,6 +16,7 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+COOKIES_PATH = os.path.join(os.path.dirname(__file__), 'cookies.txt')
 # Preia cheile in siguranta
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -53,7 +54,7 @@ def download_song(video_url):
     print(f"Caut si descarc: {video_url}...")
     ydl_opts = {
         'format': 'best',
-        'cookiefile': 'cookies.txt',
+        'cookiefile': COOKIES_PATH,
         'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -152,7 +153,7 @@ def api_search():
     if not query:
         return jsonify({"error": "Nu ai trimis niciun text!"}), 400
     ydl_opts = {'extract_flat': True,
-                'quiet': True, 'cookiefile': 'cookies.txt'}
+                'quiet': True, 'cookiefile': COOKIES_PATH}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Căutăm 10 rezultate
@@ -333,7 +334,7 @@ def api_stream():
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
     ydl_opts = {'format': 'best',
-                'quiet': True, 'cookiefile': 'cookies.txt'}
+                'quiet': True, 'cookiefile': COOKIES_PATH}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
