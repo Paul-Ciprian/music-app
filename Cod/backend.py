@@ -17,6 +17,7 @@ app = Flask(__name__)
 CORS(app)
 
 COOKIES_PATH = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+
 # Preia cheile in siguranta
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -156,7 +157,6 @@ def api_search():
                 'quiet': True, 'cookiefile': COOKIES_PATH}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Căutăm 10 rezultate
             info = ydl.extract_info(f"ytsearch10:{query}", download=False)
             results = []
             for entry in info.get('entries', []):
@@ -333,8 +333,7 @@ def api_stream():
     video_url = data.get('url')
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
-    ydl_opts = {'format': 'best',
-                'quiet': True, 'cookiefile': COOKIES_PATH}
+    ydl_opts = {'format': 'best', 'quiet': True, 'cookiefile': COOKIES_PATH}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
