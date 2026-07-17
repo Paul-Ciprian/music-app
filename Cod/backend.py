@@ -10,7 +10,7 @@ import unicodedata
 import json
 from dotenv import load_dotenv
 
-load_dotenv() 
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -258,4 +258,119 @@ def api_lyrics():
 def delete_local():
     data = request.json
     title_hint = normalize_text(data.get('title', ''))
-    for filename in os.listdir(DOWNLOAD
+    for filename in os.listdir(DOWNLOADS_DIR):
+        if title_hint in normalize_text(filename) and len(title_hint) > 2:
+            try:
+                os.remove(os.path.join(DOWNLOADS_DIR, filename))
+                return jsonify({"status": "success"}), 200
+            except:
+                pass
+    return jsonify({"status": "not_found"}), 404
+
+
+@app.route('/api/home', methods=['GET'])
+def api_home():
+    categories = [
+        {"id": "hot-100", "title": "Billboard Hot 100",
+            "thumbnail": "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"},
+        {"id": "romania-songs", "title": "Top România",
+            "thumbnail": "https://images.unsplash.com/photo-1599839619722-39751411ea63?w=500&q=80"},
+        {"id": "billboard-global-200", "title": "Global 200",
+            "thumbnail": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"},
+        {"id": "pop-songs", "title": "Pop",
+            "thumbnail": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80"},
+        {"id": "country-songs", "title": "Country",
+            "thumbnail": "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=500&q=80"},
+        {"id": "rock-songs", "title": "Rock",
+            "thumbnail": "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80"},
+        {"id": "r-b-hip-hop-songs", "title": "R&B/Hip-Hop",
+            "thumbnail": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80"},
+        {"id": "latin-songs", "title": "Latin",
+            "thumbnail": "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=500&q=80"},
+        {"id": "dance-electronic-songs", "title": "Dance & Electronic",
+            "thumbnail": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80"},
+        {"id": "hot-rap-songs", "title": "Rap",
+            "thumbnail": "https://images.unsplash.com/photo-1550184658-ff6132a71714?w=500&q=80"},
+        {"id": "uk-singles", "title": "UK Top 100",
+            "thumbnail": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?w=500&q=80"},
+        {"id": "south-korea-songs", "title": "K-Pop",
+            "thumbnail": "https://images.unsplash.com/photo-1546707012-0c9f63bb2f09?w=500&q=80"}
+    ]
+    return jsonify({"status": "success", "categories": categories}), 200
+
+
+@app.route('/api/signup', methods=['POST'])
+def signup():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    try:
+        res = supabase.auth.sign_up({"email": email, "password": password})
+        return jsonify({"status": "success", "user": res.user.id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    try:
+        res = supabase.auth.sign_in_with_password(
+            {"email": email, "password": password})
+        return jsonify({"status": "success", "user": res.user.id}), 200
+    except Exception as e:
+        return jsonify({"error": "Email sau parolă incorectă."}), 400
+
+
+@app.route('/api/stream', methods=['POST'])
+def api_stream():
+    data = request.json
+    video_url = data.get('url')
+    if not video_url:
+        return jsonify({"error": "Lipsă URL"}), 400
+    ydl_opts = {'format': 'best', 'quiet': True, 'cookiefile': COOKIES_PATH}
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+            return jsonify({"status": "success", "stream_url": info['url']}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/sync', methods=['POST'])
+def sync_data():
+    data = request.json
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Lipsa user_id"}), 400
+
+    payload = {
+        "user_id": user_id,
+        "history": data.get('history', {}),
+        "playlists": data.get('playlists', {}),
+        "favorites": data.get('favorites', []),
+        "theme": data.get('theme', '#1db954')
+    }
+    try:
+        supabase.table("user_data").upsert(payload).execute()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/sync/<user_id>', methods=['GET'])
+def get_sync(user_id):
+    try:
+        res = supabase.table("user_data").select(
+            "*").eq("user_id", user_id).execute()
+        if res.data:
+            return jsonify({"status": "success", "data": res.data[0]}), 200
+        return jsonify({"status": "not_found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(port=5000, debug=True)
