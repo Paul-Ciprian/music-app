@@ -1,7 +1,6 @@
 import os
 import requests
 from supabase import create_client, Client
-import yt_dlp
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import datetime
@@ -47,24 +46,27 @@ def save_custom_playlists(data):
 
 
 def download_song(video_url):
-    print(f"Caut si descarc: {video_url}...")
-    ydl_opts = {
-        'format': 'best',
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-        'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True,
-        'no_warnings': True
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(video_url, download=True)
-        title = info.get('title', 'Unknown')
-        artist = info.get('uploader', 'Unknown')
-        return title, artist
+    video_id = video_url.split(
+        "v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
+    res = requests.get(f"https://pipedapi.kavin.rocks/streams/{video_id}")
+    if res.status_code != 200:
+        raise Exception("Nu s-a putut prelua stream-ul")
+    stream_data = res.json()
+    audio_streams = stream_data.get('audioStreams', [])
+    if not audio_streams:
+        raise Exception("Nu există stream audio disponibil")
+
+    stream_url = audio_streams[0].get('url')
+    title = stream_data.get('title', 'Unknown').replace('/', '_')
+    artist = stream_data.get('uploader', 'Unknown').replace('/', '_')
+
+    audio_res = requests.get(stream_url, stream=True)
+    file_path = os.path.join(DOWNLOADS_DIR, f"{artist} - {title}.mp3")
+    with open(file_path, 'wb') as f:
+        for chunk in audio_res.iter_content(chunk_size=1024):
+            if chunk:
+                f.write(chunk)
+    return title, artist
 
 
 @app.route('/api/custom_playlists', methods=['GET'])
@@ -148,24 +150,26 @@ def api_search():
     query = data.get('query')
     if not query:
         return jsonify({"error": "Nu ai trimis niciun text!"}), 400
-    ydl_opts = {
-        'extract_flat': True,
-        'quiet': True,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
-    }
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch10:{query}", download=False)
+        res = requests.get(
+            f"https://pipedapi.kavin.rocks/search?q={query}&filter=videos")
+        if res.status_code == 200:
+            data_json = res.json()
+            items = data_json.get('items', [])
             results = []
-            for entry in info.get('entries', []):
-                results.append({
-                    'id': str(entry.get('id', '')),
-                    'title': entry.get('title', 'Unknown'),
-                    'artist': entry.get('uploader', 'Unknown'),
-                    'url': f"https://www.youtube.com/watch?v={entry['id']}",
-                    'thumbnail': f"https://i.ytimg.com/vi/{entry['id']}/mqdefault.jpg"
-                })
-            return jsonify({"status": "success", "results": results}), 200
+            for item in items:
+                if item.get('type') == 'stream':
+                    v_url = item.get('url', '')
+                    v_id = v_url.split("v=")[-1] if "v=" in v_url else ""
+                    results.append({
+                        'id': v_id,
+                        'title': item.get('title', 'Unknown'),
+                        'artist': item.get('uploaderName', 'Unknown'),
+                        'url': f"https://www.youtube.com/watch?v={v_id}" if v_id else "",
+                        'thumbnail': item.get('thumbnail', '')
+                    })
+            return jsonify({"status": "success", "results": results[:10]}), 200
+        return jsonify({"error": "Eroare la cautare."}), 500
     except Exception as e:
         return jsonify({"error": "Eroare la cautare."}), 500
 
@@ -320,15 +324,19 @@ def api_stream():
     video_url = data.get('url')
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
-    ydl_opts = {
-        'format': 'best',
-        'quiet': True,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
-    }
+
+    video_id = video_url.split(
+        "v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
+
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            return jsonify({"status": "success", "stream_url": info['url']}), 200
+        res = requests.get(f"https://pipedapi.kavin.rocks/streams/{video_id}")
+        if res.status_code == 200:
+            stream_data = res.json()
+            audio_streams = stream_data.get('audioStreams', [])
+            if audio_streams:
+                stream_url = audio_streams[0].get('url')
+                return jsonify({"status": "success", "stream_url": stream_url}), 200
+        return jsonify({"error": "Nu s-a putut obține stream-ul"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
