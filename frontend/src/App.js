@@ -65,7 +65,7 @@ function App() {
             favorites: updates.favorites || favorites,
             theme: updates.theme || themeColor
         };
-        await fetch('http://127.0.0.1:5000/api/sync', {
+        await fetch('https://music-app-10id.onrender.com/api/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -75,7 +75,7 @@ function App() {
 
   const handleAuth = async (type) => {
     try {
-        const res = await fetch(`http://127.0.0.1:5000/api/${type}`, {
+        const res = await fetch(`https://music-app-10id.onrender.com/api/${type}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -125,7 +125,7 @@ function App() {
     const fetchInitialData = async () => {
       try {
         // --- NOU: Preluăm datele din Cloud la logare ---
-        const syncRes = await fetch(`http://127.0.0.1:5000/api/sync/${user}`);
+        const syncRes = await fetch(`https://music-app-10id.onrender.com/api/sync/${user}`);
         const syncData = await syncRes.json();
         if (syncData.status === 'success') {
             const db = syncData.data;
@@ -135,11 +135,11 @@ function App() {
             if (db.favorites) { setFavorites(db.favorites); setFavoriteTitles(db.favorites.map(s => s.title)); }
         }
 
-        const resHome = await fetch('http://127.0.0.1:5000/api/home');
+        const resHome = await fetch('https://music-app-10id.onrender.com/api/home');
         const dataHome = await resHome.json();
         if (dataHome.status === 'success') setHomeData(dataHome.categories);
 
-        const resLocal = await fetch('http://127.0.0.1:5000/api/local_library');
+        const resLocal = await fetch('https://music-app-10id.onrender.com/api/local_library');
         const dataLocal = await resLocal.json();
         if (dataLocal.status === 'success') setDownloadedTitles(dataLocal.data.map(s => s.title));
         
@@ -167,7 +167,7 @@ function App() {
 
   const handleSearch = async () => {
     if (!query) return;
-    const response = await fetch('http://127.0.0.1:5000/api/search', {
+    const response = await fetch('https://music-app-10id.onrender.com/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: query })
@@ -182,7 +182,7 @@ function App() {
   const loadDownloads = async () => {
     setView('downloads');
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/local_library');
+      const response = await fetch('https://music-app-10id.onrender.com/api/local_library');
       const data = await response.json();
       if (data.status === 'success') {
           setDownloads(data.data);
@@ -198,7 +198,7 @@ function App() {
     setView('playlist');
     setPlaylistData(null); 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/playlist/${chartId}`);
+      const response = await fetch(`https://music-app-10id.onrender.com/api/playlist/${chartId}`);
       const data = await response.json();
       if (data.status === 'success') setPlaylistData(data);
     } catch (error) {
@@ -229,7 +229,7 @@ function App() {
   const handleOfflineToggle = async (song, e) => {
       if (e) e.stopPropagation();
       if (downloadedTitles.includes(song.title)) {
-          await fetch('http://127.0.0.1:5000/api/delete_local', { 
+          await fetch('https://music-app-10id.onrender.com/api/delete_local', { 
               method: 'POST', 
               headers: { 'Content-Type': 'application/json' }, 
               body: JSON.stringify({ title: song.title }) 
@@ -239,7 +239,7 @@ function App() {
       } else {
           let targetUrl = song.url;
           if (!targetUrl) {
-              const searchRes = await fetch('http://127.0.0.1:5000/api/search', { 
+              const searchRes = await fetch('https://music-app-10id.onrender.com/api/search', { 
                   method: 'POST', 
                   headers: { 'Content-Type': 'application/json' }, 
                   body: JSON.stringify({ query: `${song.title} ${song.artist}` }) 
@@ -248,7 +248,7 @@ function App() {
               if (searchData.status === 'success' && searchData.results.length > 0) targetUrl = searchData.results[0].url;
           }
           if (targetUrl) {
-              await fetch('http://127.0.0.1:5000/api/download', { 
+              await fetch('https://music-app-10id.onrender.com/api/download', { 
                   method: 'POST', 
                   headers: { 'Content-Type': 'application/json' }, 
                   body: JSON.stringify({ url: targetUrl, title: song.title }) 
@@ -310,7 +310,7 @@ function App() {
     try {
         let targetUrl = nextSong.url;
         if (!targetUrl) {
-            const searchRes = await fetch('http://127.0.0.1:5000/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${nextSong.title} ${nextSong.artist}` }) });
+            const searchRes = await fetch('https://music-app-10id.onrender.com/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${nextSong.title} ${nextSong.artist}` }) });
             const searchData = await searchRes.json();
             if (searchData.status === 'success' && searchData.results.length > 0) {
                 targetUrl = searchData.results[0].url;
@@ -319,7 +319,7 @@ function App() {
             }
         }
         if (targetUrl) {
-            const streamRes = await fetch('http://127.0.0.1:5000/api/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: targetUrl }) });
+            const streamRes = await fetch('https://music-app-10id.onrender.com/api/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: targetUrl }) });
             const streamData = await streamRes.json();
             if (streamData.status === 'success') {
                 nextSong.stream_url = streamData.stream_url; 
@@ -336,7 +336,7 @@ function App() {
     const song = activeQueue[currentIndex];
 
     try {
-        const res = await fetch('http://127.0.0.1:5000/api/lyrics', {
+        const res = await fetch('https://music-app-10id.onrender.com/api/lyrics', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: song.title, artist: song.artist })
@@ -385,7 +385,7 @@ function App() {
     const history = JSON.parse(localStorage.getItem('listeningHistory') || '{}');
     const historyList = Object.values(history).sort((a, b) => b.count - a.count);
     const artistHistory = historyList.filter(s => (s.artist && s.artist.includes(currentSong.artist)) || (currentSong.artist && currentSong.artist.includes(s.artist))).slice(0, 3);
-    const searchRes = await fetch('http://127.0.0.1:5000/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${currentSong.artist} ${currentSong.title} mix` }) });
+    const searchRes = await fetch('https://music-app-10id.onrender.com/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${currentSong.artist} ${currentSong.title} mix` }) });
     const searchData = await searchRes.json();
     let mixSongs = [];
     if (searchData.status === 'success') mixSongs = searchData.results.filter(s => s.title !== currentSong.title).slice(0, 7);
@@ -398,7 +398,7 @@ function App() {
     setView('playlist');
     setPlaylistData(null); 
     try {
-        const res = await fetch('http://127.0.0.1:5000/api/search', {
+        const res = await fetch('https://music-app-10id.onrender.com/api/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: mix.searchQuery })
@@ -426,11 +426,11 @@ function App() {
     }
 
     try {
-        const checkRes = await fetch('http://127.0.0.1:5000/api/check_local', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: song.title }) });
+        const checkRes = await fetch('https://music-app-10id.onrender.com/api/check_local', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: song.title }) });
         const checkData = await checkRes.json();
 
         if (checkData.status === 'found') {
-            setCurrentSongUrl(`http://127.0.0.1:5000/api/play/${encodeURIComponent(checkData.title)}`);
+            setCurrentSongUrl(`https://music-app-10id.onrender.com/api/play/${encodeURIComponent(checkData.title)}`);
             setIsPlaying(true); setLoadingUrl(null); prefetchQueue(queue, index); return; 
         }
 
@@ -441,7 +441,7 @@ function App() {
 
         let targetUrl = song.url;
         if (!targetUrl) {
-            const searchRes = await fetch('http://127.0.0.1:5000/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${song.title} ${song.artist}` }) });
+            const searchRes = await fetch('https://music-app-10id.onrender.com/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `${song.title} ${song.artist}` }) });
             const searchData = await searchRes.json();
             if (searchData.status === 'success' && searchData.results.length > 0) {
                 targetUrl = searchData.results[0].url;
@@ -451,7 +451,7 @@ function App() {
             }
         }
 
-        const response = await fetch('http://127.0.0.1:5000/api/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: targetUrl }) });
+        const response = await fetch('https://music-app-10id.onrender.com/api/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: targetUrl }) });
         const data = await response.json();
         if (data.status === 'success') {
           queue[index].stream_url = data.stream_url; 
