@@ -14,8 +14,6 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-COOKIES_PATH = os.path.join(os.path.dirname(__file__), 'cookies.txt')
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -52,7 +50,7 @@ def download_song(video_url):
     print(f"Caut si descarc: {video_url}...")
     ydl_opts = {
         'format': 'best',
-        'cookiefile': COOKIES_PATH if os.path.exists(COOKIES_PATH) else None,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -150,18 +148,22 @@ def api_search():
     query = data.get('query')
     if not query:
         return jsonify({"error": "Nu ai trimis niciun text!"}), 400
-    ydl_opts = {'extract_flat': True, 'quiet': True}
+    ydl_opts = {
+        'extract_flat': True,
+        'quiet': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+    }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch10:{query}", download=False)
+            info = ydl.extract_info(f"ytsearch10:{query}", download=False)
             results = []
             for entry in info.get('entries', []):
                 results.append({
                     'id': str(entry.get('id', '')),
                     'title': entry.get('title', 'Unknown'),
                     'artist': entry.get('uploader', 'Unknown'),
-                    'url': entry.get('webpage_url', ''),
-                    'thumbnail': entry.get('thumbnail', '')
+                    'url': f"https://www.youtube.com/watch?v={entry['id']}",
+                    'thumbnail': f"https://i.ytimg.com/vi/{entry['id']}/mqdefault.jpg"
                 })
             return jsonify({"status": "success", "results": results}), 200
     except Exception as e:
@@ -207,7 +209,7 @@ def get_favorites():
 @app.route('/api/playlist/<chart_name>', methods=['GET'])
 def get_playlist(chart_name):
     fallback_songs = [
-        {"rank": 1, "title": "Ai Vamos", "artist": "J Balvin",
+        {"rank": 1, "title": "Ay Vamos", "artist": "J Balvin",
             "last_week": 1, "peak": 1, "weeks": 5},
         {"rank": 2, "title": "Ginza", "artist": "J Balvin",
             "last_week": 2, "peak": 2, "weeks": 4},
@@ -318,7 +320,11 @@ def api_stream():
     video_url = data.get('url')
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
-    ydl_opts = {'format': 'best', 'quiet': True}
+    ydl_opts = {
+        'format': 'best',
+        'quiet': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+    }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
