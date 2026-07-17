@@ -52,7 +52,7 @@ def save_custom_playlists(data):
 def download_song(video_url):
     print(f"Caut si descarc: {video_url}...")
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'best',
         'cookiefile': 'cookies.txt',
         'outtmpl': f'{DOWNLOADS_DIR}/%(title)s.%(ext)s',
         'postprocessors': [{
@@ -332,7 +332,7 @@ def api_stream():
     video_url = data.get('url')
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
-    ydl_opts = {'format': 'bestaudio/best',
+    ydl_opts = {'format': 'best',
                 'quiet': True, 'cookiefile': 'cookies.txt'}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
