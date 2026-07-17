@@ -24,6 +24,21 @@ CUSTOM_PLAYLISTS_FILE = "custom_playlists.json"
 if not os.path.exists(DOWNLOADS_DIR):
     os.makedirs(DOWNLOADS_DIR)
 
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.adminforge.de",
+    "https://piped-api.privacy.com.de"
+]
+
+def get_piped_data(video_id):
+    for instance in PIPED_INSTANCES:
+        try:
+            res = requests.get(f"{instance}/streams/{video_id}", timeout=5)
+            if res.status_code == 200:
+                return res.json()
+        except:
+            continue
+    return None
 
 def normalize_text(text):
     if not text:
@@ -32,26 +47,22 @@ def normalize_text(text):
     text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
     return text.lower().strip()
 
-
 def load_custom_playlists():
     if not os.path.exists(CUSTOM_PLAYLISTS_FILE):
         return {}
     with open(CUSTOM_PLAYLISTS_FILE, 'r') as f:
         return json.load(f)
 
-
 def save_custom_playlists(data):
     with open(CUSTOM_PLAYLISTS_FILE, 'w') as f:
         json.dump(data, f)
 
-
 def download_song(video_url):
-    video_id = video_url.split(
-        "v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
-    res = requests.get(f"https://pipedapi.kavin.rocks/streams/{video_id}")
-    if res.status_code != 200:
+    video_id = video_url.split("v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
+    stream_data = get_piped_data(video_id)
+    if not stream_data:
         raise Exception("Nu s-a putut prelua stream-ul")
-    stream_data = res.json()
+    
     audio_streams = stream_data.get('audioStreams', [])
     if not audio_streams:
         raise Exception("Nu există stream audio disponibil")
@@ -68,11 +79,9 @@ def download_song(video_url):
                 f.write(chunk)
     return title, artist
 
-
 @app.route('/api/custom_playlists', methods=['GET'])
 def get_custom_playlists():
     return jsonify({"status": "success", "data": load_custom_playlists()}), 200
-
 
 @app.route('/api/custom_playlists', methods=['POST'])
 def create_custom_playlist():
@@ -85,7 +94,6 @@ def create_custom_playlist():
         save_custom_playlists(playlists)
     return jsonify({"status": "success", "data": playlists}), 200
 
-
 @app.route('/api/custom_playlists/add', methods=['POST'])
 def add_to_custom_playlist():
     name = request.json.get('name')
@@ -97,22 +105,18 @@ def add_to_custom_playlist():
             save_custom_playlists(playlists)
     return jsonify({"status": "success"}), 200
 
-
 @app.route('/api/toggle_favorite', methods=['POST'])
 def toggle_favorite():
     data = request.json
     title = data.get('title')
     artist = data.get('artist')
-    res = supabase.table("favorite_songs").select(
-        "*").eq("title", title).execute()
+    res = supabase.table("favorite_songs").select("*").eq("title", title).execute()
     if res.data:
         supabase.table("favorite_songs").delete().eq("title", title).execute()
         return jsonify({"status": "removed"}), 200
     else:
-        supabase.table("favorite_songs").insert(
-            {"title": title, "artist": artist, "is_offline": True}).execute()
+        supabase.table("favorite_songs").insert({"title": title, "artist": artist, "is_offline": True}).execute()
         return jsonify({"status": "added"}), 200
-
 
 @app.route('/api/check_local', methods=['POST'])
 def check_local():
@@ -123,7 +127,6 @@ def check_local():
         if title in norm_file and len(title) > 2:
             return jsonify({"status": "found", "title": filename}), 200
     return jsonify({"status": "not_found"}), 200
-
 
 @app.route('/api/download', methods=['POST'])
 def api_download():
@@ -143,36 +146,36 @@ def api_download():
     except Exception as e:
         return jsonify({"error": "A aparut o eroare la descarcare."}), 500
 
-
 @app.route('/api/search', methods=['POST'])
 def api_search():
     data = request.json
     query = data.get('query')
     if not query:
         return jsonify({"error": "Nu ai trimis niciun text!"}), 400
-    try:
-        res = requests.get(
-            f"https://pipedapi.kavin.rocks/search?q={query}&filter=videos")
-        if res.status_code == 200:
-            data_json = res.json()
-            items = data_json.get('items', [])
-            results = []
-            for item in items:
-                if item.get('type') == 'stream':
-                    v_url = item.get('url', '')
-                    v_id = v_url.split("v=")[-1] if "v=" in v_url else ""
-                    results.append({
-                        'id': v_id,
-                        'title': item.get('title', 'Unknown'),
-                        'artist': item.get('uploaderName', 'Unknown'),
-                        'url': f"https://www.youtube.com/watch?v={v_id}" if v_id else "",
-                        'thumbnail': item.get('thumbnail', '')
-                    })
-            return jsonify({"status": "success", "results": results[:10]}), 200
-        return jsonify({"error": "Eroare la cautare."}), 500
-    except Exception as e:
-        return jsonify({"error": "Eroare la cautare."}), 500
-
+    
+    for instance in PIPED_INSTANCES:
+        try:
+            res = requests.get(f"{instance}/search?q={query}&filter=videos", timeout=5)
+            if res.status_code == 200:
+                data_json = res.json()
+                items = data_json.get('items', [])
+                results = []
+                for item in items:
+                    if item.get('type') == 'stream':
+                        v_url = item.get('url', '')
+                        v_id = v_url.split("v=")[-1] if "v=" in v_url else ""
+                        results.append({
+                            'id': v_id,
+                            'title': item.get('title', 'Unknown'),
+                            'artist': item.get('uploaderName', 'Unknown'),
+                            'url': f"https://www.youtube.com/watch?v={v_id}" if v_id else "",
+                            'thumbnail': item.get('thumbnail', '')
+                        })
+                return jsonify({"status": "success", "results": results[:10]}), 200
+        except:
+            continue
+            
+    return jsonify({"error": "Eroare la cautare."}), 500
 
 @app.route('/api/play/<path:title>', methods=['GET'])
 def play_song(title):
@@ -183,7 +186,6 @@ def play_song(title):
         if filename.startswith(title):
             return send_file(os.path.join(DOWNLOADS_DIR, filename))
     return jsonify({"error": "Melodia nu a fost gasita"}), 404
-
 
 @app.route('/api/local_library', methods=['GET'])
 def get_local_library():
@@ -200,7 +202,6 @@ def get_local_library():
                 songs.append({"title": title, "artist": artist, "url": ""})
     return jsonify({"status": "success", "data": songs}), 200
 
-
 @app.route('/api/favorites', methods=['GET'])
 def get_favorites():
     try:
@@ -209,16 +210,12 @@ def get_favorites():
     except Exception as e:
         return jsonify({"error": "Nu am putut prelua datele"}), 500
 
-
 @app.route('/api/playlist/<chart_name>', methods=['GET'])
 def get_playlist(chart_name):
     fallback_songs = [
-        {"rank": 1, "title": "Ay Vamos", "artist": "J Balvin",
-            "last_week": 1, "peak": 1, "weeks": 5},
-        {"rank": 2, "title": "Ginza", "artist": "J Balvin",
-            "last_week": 2, "peak": 2, "weeks": 4},
-        {"rank": 3, "title": "Canta Lautare", "artist": "Lele",
-            "last_week": 3, "peak": 3, "weeks": 2}
+        {"rank": 1, "title": "Ay Vamos", "artist": "J Balvin", "last_week": 1, "peak": 1, "weeks": 5},
+        {"rank": 2, "title": "Ginza", "artist": "J Balvin", "last_week": 2, "peak": 2, "weeks": 4},
+        {"rank": 3, "title": "Canta Lautare", "artist": "Lele", "last_week": 3, "peak": 3, "weeks": 2}
     ]
     return jsonify({
         "status": "success",
@@ -226,27 +223,23 @@ def get_playlist(chart_name):
         "songs": fallback_songs
     }), 200
 
-
 @app.route('/api/lyrics', methods=['POST'])
 def api_lyrics():
     data = request.json
     title = data.get('title', '')
     artist = data.get('artist', '')
     try:
-        res = requests.get(
-            f"https://lrclib.net/api/get?track_name={title}&artist_name={artist}")
+        res = requests.get(f"https://lrclib.net/api/get?track_name={title}&artist_name={artist}")
         if res.status_code == 200:
             return jsonify({"status": "success", "data": res.json()}), 200
 
-        search_res = requests.get(
-            f"https://lrclib.net/api/search?q={title} {artist}")
+        search_res = requests.get(f"https://lrclib.net/api/search?q={title} {artist}")
         if search_res.status_code == 200 and len(search_res.json()) > 0:
             return jsonify({"status": "success", "data": search_res.json()[0]}), 200
 
         return jsonify({"status": "not_found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/delete_local', methods=['POST'])
 def delete_local():
@@ -261,37 +254,23 @@ def delete_local():
                 pass
     return jsonify({"status": "not_found"}), 404
 
-
 @app.route('/api/home', methods=['GET'])
 def api_home():
     categories = [
-        {"id": "hot-100", "title": "Billboard Hot 100",
-            "thumbnail": "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"},
-        {"id": "romania-songs", "title": "Top România",
-            "thumbnail": "https://images.unsplash.com/photo-1599839619722-39751411ea63?w=500&q=80"},
-        {"id": "billboard-global-200", "title": "Global 200",
-            "thumbnail": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"},
-        {"id": "pop-songs", "title": "Pop",
-            "thumbnail": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80"},
-        {"id": "country-songs", "title": "Country",
-            "thumbnail": "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=500&q=80"},
-        {"id": "rock-songs", "title": "Rock",
-            "thumbnail": "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80"},
-        {"id": "r-b-hip-hop-songs", "title": "R&B/Hip-Hop",
-            "thumbnail": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80"},
-        {"id": "latin-songs", "title": "Latin",
-            "thumbnail": "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=500&q=80"},
-        {"id": "dance-electronic-songs", "title": "Dance & Electronic",
-            "thumbnail": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80"},
-        {"id": "hot-rap-songs", "title": "Rap",
-            "thumbnail": "https://images.unsplash.com/photo-1550184658-ff6132a71714?w=500&q=80"},
-        {"id": "uk-singles", "title": "UK Top 100",
-            "thumbnail": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?w=500&q=80"},
-        {"id": "south-korea-songs", "title": "K-Pop",
-            "thumbnail": "https://images.unsplash.com/photo-1546707012-0c9f63bb2f09?w=500&q=80"}
+        {"id": "hot-100", "title": "Billboard Hot 100", "thumbnail": "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&q=80"},
+        {"id": "romania-songs", "title": "Top România", "thumbnail": "https://images.unsplash.com/photo-1599839619722-39751411ea63?w=500&q=80"},
+        {"id": "billboard-global-200", "title": "Global 200", "thumbnail": "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80"},
+        {"id": "pop-songs", "title": "Pop", "thumbnail": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80"},
+        {"id": "country-songs", "title": "Country", "thumbnail": "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=500&q=80"},
+        {"id": "rock-songs", "title": "Rock", "thumbnail": "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80"},
+        {"id": "r-b-hip-hop-songs", "title": "R&B/Hip-Hop", "thumbnail": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80"},
+        {"id": "latin-songs", "title": "Latin", "thumbnail": "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=500&q=80"},
+        {"id": "dance-electronic-songs", "title": "Dance & Electronic", "thumbnail": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80"},
+        {"id": "hot-rap-songs", "title": "Rap", "thumbnail": "https://images.unsplash.com/photo-1550184658-ff6132a71714?w=500&q=80"},
+        {"id": "uk-singles", "title": "UK Top 100", "thumbnail": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?w=500&q=80"},
+        {"id": "south-korea-songs", "title": "K-Pop", "thumbnail": "https://images.unsplash.com/photo-1546707012-0c9f63bb2f09?w=500&q=80"}
     ]
     return jsonify({"status": "success", "categories": categories}), 200
-
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -304,19 +283,16 @@ def signup():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
     email = data.get('email')
     password = data.get('password')
     try:
-        res = supabase.auth.sign_in_with_password(
-            {"email": email, "password": password})
+        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
         return jsonify({"status": "success", "user": res.user.id}), 200
     except Exception as e:
         return jsonify({"error": "Email sau parolă incorectă."}), 400
-
 
 @app.route('/api/stream', methods=['POST'])
 def api_stream():
@@ -325,13 +301,11 @@ def api_stream():
     if not video_url:
         return jsonify({"error": "Lipsă URL"}), 400
 
-    video_id = video_url.split(
-        "v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
+    video_id = video_url.split("v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
 
     try:
-        res = requests.get(f"https://pipedapi.kavin.rocks/streams/{video_id}")
-        if res.status_code == 200:
-            stream_data = res.json()
+        stream_data = get_piped_data(video_id)
+        if stream_data:
             audio_streams = stream_data.get('audioStreams', [])
             if audio_streams:
                 stream_url = audio_streams[0].get('url')
@@ -339,7 +313,6 @@ def api_stream():
         return jsonify({"error": "Nu s-a putut obține stream-ul"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/sync', methods=['POST'])
 def sync_data():
@@ -361,18 +334,15 @@ def sync_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/api/sync/<user_id>', methods=['GET'])
 def get_sync(user_id):
     try:
-        res = supabase.table("user_data").select(
-            "*").eq("user_id", user_id).execute()
+        res = supabase.table("user_data").select("*").eq("user_id", user_id).execute()
         if res.data:
             return jsonify({"status": "success", "data": res.data[0]}), 200
         return jsonify({"status": "not_found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
