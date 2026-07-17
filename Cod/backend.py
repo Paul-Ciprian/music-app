@@ -157,7 +157,7 @@ def api_search():
                 'quiet': True, 'cookiefile': COOKIES_PATH}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch10:{query}", download=False)
+            info = ydl.extract_info(f"scsearch10:{query}", download=False)
             results = []
             for entry in info.get('entries', []):
                 results.append({
